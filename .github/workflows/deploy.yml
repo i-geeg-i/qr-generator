@@ -16,12 +16,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install deps
         run: npm ci
 
       - name: Build
         run: npm run build
+
+      - name: Ensure release dir exists
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            mkdir -p /var/www/qr.geeg.tatar/releases/${{ github.sha }}
 
       - name: Upload dist via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -31,10 +42,9 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "dist/*"
           target: "/var/www/qr.geeg.tatar/releases/${{ github.sha }}"
-          strip_components: 1
 
       - name: Activate release
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
@@ -43,6 +53,6 @@ jobs:
             set -e
             cd /var/www/qr.geeg.tatar
             ln -sfn releases/${{ github.sha }} current
-            # Keep the latest 5 releases
             ls -dt releases/* | tail -n +6 | xargs -r rm -rf
             sudo nginx -t && sudo systemctl reload nginx
+
